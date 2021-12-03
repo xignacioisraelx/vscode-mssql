@@ -93,7 +93,7 @@ export class AzureController {
         this.azureMessageDisplayer = new AzureMessageDisplayer();
     }
 
-    public async getTokens(profile: ConnectionProfile, accountStore: AccountStore, settings: AADResource): Promise<ConnectionProfile> {
+    public async getTokens(profile: ConnectionProfile, accountStore: AccountStore, settings: AADResource, tenantId?: string): Promise<ConnectionProfile> {
         let account: IAccount;
         let config = vscode.workspace.getConfiguration('mssql').get('azureActiveDirectory');
         if (config === utils.azureAuthTypeToString(AzureAuthType.AuthCodeGrant)) {
@@ -130,7 +130,7 @@ export class AzureController {
         return profile;
     }
 
-    public async refreshTokenWrapper(profile, accountStore, accountAnswer, settings: AADResource): Promise<ConnectionProfile> {
+    public async refreshTokenWrapper(profile, accountStore, accountAnswer, settings: AADResource, tenantId?: string): Promise<ConnectionProfile> {
         let account = accountStore.getAccount(accountAnswer.key.id);
         if (!account) {
             await this._vscodeWrapper.showErrorMessage(LocalizedConstants.msgAccountNotFound);

@@ -15,6 +15,7 @@ import { AzureController } from '../azure/azureController';
 import { AccountStore } from '../azure/accountStore';
 import { IAccount } from './contracts/azure/accountInterfaces';
 import providerSettings from '../azure/providerSettings';
+import { Tenant } from '@microsoft/ads-adal-library';
 
 // Concrete implementation of the IConnectionProfile interface
 
@@ -67,6 +68,7 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
         }
         let azureAccountChoices: INameValueChoice[] = ConnectionProfile.getAccountChoices(accountStore);
         let accountAnswer: IAccount;
+        let accountTenant: Tenant;
         azureAccountChoices.unshift({ name: LocalizedConstants.azureAddAccount, value: 'addAccount'});
 
 
@@ -91,6 +93,14 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
                 onAnswered: (value: IAccount) => accountAnswer = value
             },
             {
+                type: QuestionTypes.expand,
+                name: LocalizedConstants.aad,
+                message: LocalizedConstants.azureChooseTenant,
+                choices: ConnectionProfile.getTenantChoices(accountAnswer),
+                shouldPrompt: (answers) => profile.isAzureActiveDirectory() && accountAnswer.properties.tenants.length > 1,
+                onAnswered: (value: Tenant) => accountTenant = value
+            },
+            {
                 type: QuestionTypes.input,
                 name: LocalizedConstants.profileNamePrompt,
                 message: LocalizedConstants.profileNamePrompt,
@@ -106,10 +116,10 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
         return prompter.prompt(questions, true).then(async answers => {
             if (answers.authenticationType === 'AzureMFA') {
                 if (answers.AAD === 'addAccount') {
-                    profile = await azureController.getTokens(profile, accountStore, providerSettings.resources.databaseResource);
+                    profile = await azureController.getTokens(profile, accountStore, providerSettings.resources.databaseResource, accountTenant.id);
                 } else {
                     try {
-                        profile = await azureController.refreshTokenWrapper(profile, accountStore, accountAnswer, providerSettings.resources.databaseResource);
+                        profile = await azureController.refreshTokenWrapper(profile, accountStore, accountAnswer, providerSettings.resources.databaseResource, accountTenant.id);
                     } catch (error) {
                         console.log(`Refreshing tokens failed: ${error}`);
                     }
@@ -162,6 +172,16 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
         if (accounts.length > 0) {
             for (let account of accounts) {
                 choices.push({ name: account?.displayInfo?.displayName, value: account });
+            }
+        }
+        return choices;
+    }
+    public static getTenantChoices(account: IAccount): INameValueChoice[] {
+        let tenants = account.properties.tenants;
+        let choices: Array<INameValueChoice> = [];
+        if (tenants.length > 0) {
+            for (let tenant of tenants) {
+                choices.push({ name: tenant, value: tenant });
             }
         }
         return choices;
