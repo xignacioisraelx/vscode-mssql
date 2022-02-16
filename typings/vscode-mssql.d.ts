@@ -133,6 +133,11 @@ declare module 'vscode-mssql' {
         expiresOn: number | undefined;
 
         /**
+         * Tenant ID
+         */
+        tenantId: string | undefined;
+
+        /**
          * Gets or sets a Boolean value that indicates whether SQL Server uses SSL encryption for all data sent between the client and server if
          * the server has a certificate installed.
          */

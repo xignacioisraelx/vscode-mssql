@@ -100,9 +100,11 @@ export class AzureController {
             let azureCodeGrant = await this.createAuthCodeGrant();
             account = await azureCodeGrant.startLogin();
             await accountStore.addAccount(account);
-            const token = await azureCodeGrant.getAccountSecurityToken(
-                account, azureCodeGrant.getHomeTenant(account).id, settings
-            );
+            let token: Token;
+            tenantId ? token = await azureCodeGrant.getAccountSecurityToken(account, tenantId, settings) :
+                token = await azureCodeGrant.getAccountSecurityToken(
+                    account, azureCodeGrant.getHomeTenant(account).id, settings
+                );
             if (!token) {
                 let errorMessage = LocalizedConstants.msgGetTokenFail;
                 this._vscodeWrapper.showErrorMessage(errorMessage);
@@ -116,7 +118,7 @@ export class AzureController {
             account = await azureDeviceCode.startLogin();
             await accountStore.addAccount(account);
             const token = await azureDeviceCode.getAccountSecurityToken(
-                account, azureDeviceCode.getHomeTenant(account).id, settings
+                account, tenantId, settings
             );
             if (!token) {
                 let errorMessage = LocalizedConstants.msgGetTokenFail;
@@ -130,13 +132,13 @@ export class AzureController {
         return profile;
     }
 
-    public async refreshTokenWrapper(profile, accountStore, accountAnswer, settings: AADResource, tenantId?: string): Promise<ConnectionProfile> {
+    public async refreshTokenWrapper(profile, accountStore, accountAnswer, settings: AADResource, tenantId: string): Promise<ConnectionProfile> {
         let account = accountStore.getAccount(accountAnswer.key.id);
         if (!account) {
             await this._vscodeWrapper.showErrorMessage(LocalizedConstants.msgAccountNotFound);
             throw new Error(LocalizedConstants.msgAccountNotFound);
         }
-        let azureAccountToken = await this.refreshToken(account, accountStore, settings);
+        let azureAccountToken = await this.refreshToken(account, accountStore, settings, tenantId);
         if (!azureAccountToken) {
             let errorMessage = LocalizedConstants.msgAccountRefreshFailed;
             return this._vscodeWrapper.showErrorMessage(errorMessage, LocalizedConstants.refreshTokenLabel).then(async result => {
@@ -155,7 +157,7 @@ export class AzureController {
         return profile;
     }
 
-    public async refreshToken(account: IAccount, accountStore: AccountStore, settings: AADResource): Promise<Token | undefined> {
+    public async refreshToken(account: IAccount, accountStore: AccountStore, settings: AADResource, tenantId: string): Promise<Token | undefined> {
         try {
             let token: Token;
             if (account.properties.azureAuthType === 0) {
@@ -166,7 +168,7 @@ export class AzureController {
                     return undefined;
                 }
                 await accountStore.addAccount(newAccount);
-                token = await azureCodeGrant.getAccountSecurityToken(account, azureCodeGrant.getHomeTenant(account).id, settings);
+                token = await azureCodeGrant.getAccountSecurityToken(account, tenantId, settings);
             } else if (account.properties.azureAuthType === 1) {
                 // Auth Device Code
                 let azureDeviceCode = await this.createDeviceCode();
@@ -176,7 +178,7 @@ export class AzureController {
                     return undefined;
                 }
                 token = await azureDeviceCode.getAccountSecurityToken(
-                    account, azureDeviceCode.getHomeTenant(account).id, providerSettings.resources.databaseResource);
+                    account, tenantId, providerSettings.resources.databaseResource);
             }
             return token;
         } catch (ex) {

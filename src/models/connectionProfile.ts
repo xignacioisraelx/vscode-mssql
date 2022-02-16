@@ -31,6 +31,7 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
     public expiresOn: number | undefined;
     public accountStore: AccountStore;
     public accountId: string;
+    public tenantId: string;
 
     constructor(connectionCredentials?: ConnectionCredentials) {
         super();
@@ -67,7 +68,8 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
             profile.authenticationType = authOptions[0].value;
         }
         let azureAccountChoices: INameValueChoice[] = ConnectionProfile.getAccountChoices(accountStore);
-        let accountAnswer: IAccount;
+        let azureTenantChoices: INameValueChoice[];
+        let accountAnswer: IAccount | string;
         let accountTenant: Tenant;
         azureAccountChoices.unshift({ name: LocalizedConstants.azureAddAccount, value: 'addAccount'});
 
@@ -90,14 +92,20 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
                 message: LocalizedConstants.azureChooseAccount,
                 choices: azureAccountChoices,
                 shouldPrompt: (answers) => profile.isAzureActiveDirectory(),
-                onAnswered: (value: IAccount) => accountAnswer = value
+                onAnswered: (value: IAccount | string) => {
+                    accountAnswer = value;
+                    if (typeof(accountAnswer) !== 'string') {
+                        azureTenantChoices = this.getTenantChoices(accountAnswer);
+                    }
+                }
             },
             {
                 type: QuestionTypes.expand,
                 name: LocalizedConstants.aad,
                 message: LocalizedConstants.azureChooseTenant,
-                choices: ConnectionProfile.getTenantChoices(accountAnswer),
-                shouldPrompt: (answers) => profile.isAzureActiveDirectory() && accountAnswer.properties.tenants.length > 1,
+                choices: azureTenantChoices,
+                shouldPrompt: (answers) => profile.isAzureActiveDirectory(),
+                //   && typeof(accountAnswer) !== 'string' && accountAnswer.properties.tenants.length > 1
                 onAnswered: (value: Tenant) => accountTenant = value
             },
             {
@@ -181,7 +189,7 @@ export class ConnectionProfile extends ConnectionCredentials implements IConnect
         let choices: Array<INameValueChoice> = [];
         if (tenants.length > 0) {
             for (let tenant of tenants) {
-                choices.push({ name: tenant, value: tenant });
+                choices.push({ name: tenant.displayName, value: tenant });
             }
         }
         return choices;
